@@ -60,17 +60,19 @@ where
             n => n * 2,
         };
 
-        let mut new_buckets = vec![Bucket::new(); target_size];
-
-        for Bucket { items } in self.buckets.drain(..) {
-            items.iter().for_each(|(key, value)| {
-                let key = key.clone();
-                let value = value.clone();
-                let mut hasher = DefaultHasher::new();
-                key.hash(&mut hasher);
-                let bucket = hasher.finish() as usize % new_buckets.len();
-                new_buckets[bucket].items.push((key, value));
-            });
+        // let mut new_buckets = vec![Bucket::new(); target_size];
+        let mut new_buckets = Vec::with_capacity(target_size);
+        new_buckets.extend((0..target_size).map(|_| Bucket::new()));
+        
+        for (key, value) in self
+            .buckets
+            .iter_mut()
+            .flat_map(|bucket| bucket.items.drain(..))
+        {
+            let mut hasher = DefaultHasher::new();
+            key.hash(&mut hasher);
+            let bucket = hasher.finish() as usize % new_buckets.len();
+            new_buckets[bucket].items.push((key, value));
         }
 
         mem::replace(&mut self.buckets, new_buckets);
