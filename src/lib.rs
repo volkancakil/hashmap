@@ -1,5 +1,5 @@
 use std::{
-    borrow::{self, Borrow},
+    borrow::Borrow,
     collections::hash_map::DefaultHasher,
     hash::{Hash, Hasher},
     mem,
