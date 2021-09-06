@@ -1,6 +1,5 @@
 // #![feature(nill)]
 #![allow(unused_must_use)]
-
 use std::{
     borrow::Borrow,
     collections::hash_map::DefaultHasher,
@@ -14,23 +13,19 @@ const INITIAL_NBUCKETS: usize = 1;
 struct Bucket<K, V> {
     items: Vec<(K, V)>,
 }
-
 impl<K, V> Bucket<K, V> {
     fn new() -> Self {
         Bucket { items: Vec::new() }
     }
 }
-
 pub struct HashMap<K, V> {
     buckets: Vec<Bucket<K, V>>,
     items: usize,
 }
-
 pub enum Entry<'a, K: 'a, V: 'a> {
     Occupied(OccupiedEntry<'a, K, V>),
     Vacant(VacantEntry<'a, K, V>),
 }
-
 pub struct OccupiedEntry<'a, K, V> {
     entry: &'a mut (K, V),
 }
@@ -39,7 +34,6 @@ pub struct VacantEntry<'a, K: 'a, V: 'a> {
     map: &'a mut HashMap<K, V>,
     bucket: usize,
 }
-
 impl<'a, K: 'a, V: 'a> VacantEntry<'a, K, V> {
     pub fn insert(self, value: V) -> &'a mut V
     where
@@ -50,7 +44,6 @@ impl<'a, K: 'a, V: 'a> VacantEntry<'a, K, V> {
         &mut self.map.buckets[self.bucket].items.last_mut().unwrap().1
     }
 }
-
 impl<'a, K, V> Entry<'a, K, V>
 where
     K: Hash + Eq,
@@ -78,21 +71,19 @@ where
         self.or_insert_with(Default::default)
     }
 }
-
 impl<K, V> Default for HashMap<K, V>
 where
-    K: Hash + Eq + std::clone::Clone,
-    V: std::clone::Clone,
+    K: Hash + Eq + Clone,
+    V: Clone,
 {
     fn default() -> Self {
         Self::new()
     }
 }
-
 impl<K, V> HashMap<K, V>
 where
-    K: Hash + Eq + std::clone::Clone,
-    V: std::clone::Clone,
+    K: Hash + Eq + Clone,
+    V: Clone,
 {
     pub fn new() -> Self {
         HashMap {
@@ -239,13 +230,11 @@ where
         mem::replace(&mut self.buckets, new_buckets);
     }
 }
-
 pub struct Iter<'a, K: 'a, V: 'a> {
     map: &'a HashMap<K, V>,
     bucket: usize,
     at: usize,
 }
-
 impl<'a, K, V> Iterator for Iter<'a, K, V> {
     type Item = (&'a K, &'a V);
     fn next(&mut self) -> Option<Self::Item> {
@@ -267,7 +256,6 @@ impl<'a, K, V> Iterator for Iter<'a, K, V> {
         }
     }
 }
-
 impl<'a, K, V> IntoIterator for &'a HashMap<K, V> {
     type Item = (&'a K, &'a V);
     type IntoIter = Iter<'a, K, V>;
