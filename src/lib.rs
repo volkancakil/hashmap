@@ -1,3 +1,6 @@
+// #![feature(nill)]
+#![allow(unused_must_use)]
+
 use std::{
     borrow::Borrow,
     collections::hash_map::DefaultHasher,
@@ -23,6 +26,59 @@ pub struct HashMap<K, V> {
     items: usize,
 }
 
+pub enum Entry<'a, K: 'a, V: 'a> {
+    Occupied(OccupiedEntry<'a, K, V>),
+    Vacant(VacantEntry<'a, K, V>),
+}
+
+pub struct OccupiedEntry<'a, K, V> {
+    entry: &'a mut (K, V),
+}
+pub struct VacantEntry<'a, K: 'a, V: 'a> {
+    key: K,
+    map: &'a mut HashMap<K, V>,
+    bucket: usize,
+}
+
+impl<'a, K: 'a, V: 'a> VacantEntry<'a, K, V> {
+    pub fn insert(self, value: V) -> &'a mut V
+    where
+        K: Hash + Eq,
+    {
+        self.map.buckets[self.bucket].items.push((self.key, value));
+        self.map.items += 1;
+        &mut self.map.buckets[self.bucket].items.last_mut().unwrap().1
+    }
+}
+
+impl<'a, K, V> Entry<'a, K, V>
+where
+    K: Hash + Eq,
+{
+    pub fn or_insert(self, value: V) -> &'a mut V {
+        match self {
+            Entry::Occupied(element) => &mut element.entry.1,
+            Entry::Vacant(element) => element.insert(value),
+        }
+    }
+    pub fn or_insert_with<F>(self, maker: F) -> &'a mut V
+    where
+        F: FnOnce() -> V,
+    {
+        match self {
+            Entry::Occupied(element) => &mut element.entry.1,
+            Entry::Vacant(element) => element.insert(maker()),
+        }
+    }
+
+    pub fn or_default(self) -> &'a mut V
+    where
+        V: Default,
+    {
+        self.or_insert_with(Default::default)
+    }
+}
+
 impl<K, V> Default for HashMap<K, V>
 where
     K: Hash + Eq + std::clone::Clone,
@@ -45,31 +101,54 @@ where
         }
     }
 
-    fn bucket<Q>(&self, key: &Q) -> usize
+    fn bucket<Q>(&self, key: &Q) -> Option<usize>
     where
         K: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
+        if self.buckets.is_empty() {
+            return None;
+        }
+
         let mut hasher = DefaultHasher::new();
         key.hash(&mut hasher);
-        hasher.finish() as usize % self.buckets.len()
+        Some(hasher.finish() as usize % self.buckets.len())
     }
 
+    pub fn entry(&mut self, key: K) -> Entry<K, V> {
+        if self.buckets.is_empty() || self.items > 3 * self.buckets.len() / 4 {
+            self.resize();
+        }
+        let bucket = self.bucket(&key).expect("buckets.is_empty() handled above");
+        match self.buckets[bucket]
+            .items
+            .iter()
+            .position(|&(ref ekey, _)| ekey == &key)
+        {
+            Some(index) => Entry::Occupied(OccupiedEntry {
+                entry: &mut self.buckets[bucket].items[index],
+            }),
+            None => Entry::Vacant(VacantEntry {
+                map: self,
+                key,
+                bucket,
+            }),
+        }
+    }
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
         if self.buckets.is_empty() || self.items > self.buckets.len() * 2 / 4 {
             self.resize();
         }
 
-        let bucket = self.bucket(&key);
+        let bucket = self.bucket(&key).expect("buckets.is_empty() handled above");
         let bucket = &mut self.buckets[bucket];
-
-        self.items += 1;
         for (ref ekey, ref mut evalue) in bucket.items.iter_mut() {
             if ekey == &key {
                 return Some(mem::replace(evalue, value));
             }
         }
 
+        self.items += 1;
         bucket.items.push((key, value));
         None
     }
@@ -93,7 +172,7 @@ where
         K: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        let bucket = self.bucket(key);
+        let bucket = self.bucket(key)?;
         self.buckets[bucket]
             .items
             .iter()
@@ -106,9 +185,12 @@ where
         K: Borrow<Q>,
         Q: Hash + Eq + ?Sized,
     {
-        let bucket = self.bucket(key);
+        let bucket = self.bucket(key)?;
         let bucket = &mut self.buckets[bucket];
-        let removed = bucket.items.iter().position(|&(ref ekey, _)| ekey.borrow() == key)?;
+        let removed = bucket
+            .items
+            .iter()
+            .position(|&(ref ekey, _)| ekey.borrow() == key)?;
         self.items -= 1;
         Some(bucket.items.swap_remove(removed).1)
     }
