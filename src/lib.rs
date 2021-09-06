@@ -119,7 +119,20 @@ where
         if self.buckets.is_empty() || self.items > 3 * self.buckets.len() / 4 {
             self.resize();
         }
+
+        // let bucket = self.bucket(&key);
+        // let bucket = &mut self.buckets[bucket];
+
+        // match bucket.items.iter_mut().find(|&&mut (ref ekey, _)| ekey == &key) {
+        //     Some(entry) => Entry::Occupied(OccupiedEntry { entry: unsafe { mem::transmute(entry) } }),
+        //     None => Entry::Vacant(VacantEntry {
+        //         key,
+        //         bucket,
+        //     }),
+        // }
+
         let bucket = self.bucket(&key).expect("buckets.is_empty() handled above");
+
         match self.buckets[bucket]
             .items
             .iter()
